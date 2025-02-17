@@ -1,4 +1,6 @@
 'use client'
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 
@@ -7,26 +9,37 @@ const SOCKET_SERVER_URL = "https://websocket-server-bdk7.onrender.com"; // Updat
 let socket;
 
 export default function Home() {
+  const router = useRouter();
+  const {data: session}=useSession();
   const [turn, setturn] = useState('X');
-  const [countX,setcountX] = useState(0);
-  const [countO,setcountO] = useState(0);
   const [currX,setcurrX]=useState([]);
   const [currO,setcurrO]=useState([]);
   const [gameclear,setgameclear]=useState(0);
+  
 
   useEffect(() => {
     socket=io(SOCKET_SERVER_URL);
-
     socket.on("move",(data)=>{
       setturn(data.turn);
       gameify(data.id,data.turn);
+      if(check(data.id,data.turn)){
+        alert(`Player ${data.turn} has won the match`);
+        setgameclear(1);
+      };
     });
-    
     return ()=>{
       socket.disconnect();
     };
   },[]);
+
   
+  useEffect(() => {
+    if(!session){
+      router.push("/login")
+    }
+  }, [session,router])
+  
+
   
   const check=(id,val)=>{
     const arr=[];
@@ -38,11 +51,7 @@ export default function Home() {
     for(k=n;k<currO.length;k++) arr[currO[k]-1]='O';
     arr[id-1]=val;
     let ck,rk,i;
-    // console.log(id,val,arr);
-    // console.log("currx: ",currX);
-    // console.log("curro: ",currO);
     for(let j=1;j<=3;j++){
-      //Horizontal check
       ck=arr[(j-1)*3];
       for(i=(j-1)*3;i<(3*j);i++){
         if(arr[i]=='' || arr[i]!=ck)  break;
@@ -51,7 +60,6 @@ export default function Home() {
         console.log("horizontal")
         return true;
       }
-      //Vertical check
       rk=arr[j-1];
       for(i=j-1;i<(6+j);i+=3){
         if(arr[i]=='' || arr[i]!=rk)  break;
@@ -61,7 +69,6 @@ export default function Home() {
         return true;
       }
     }
-    //Cross check
     if((arr[4]!='') && ((arr[0]==arr[4] && arr[4]==arr[8]) || (arr[6]==arr[4] && arr[4]==arr[2]))){
       console.log("cross");
       return true;
@@ -102,16 +109,9 @@ export default function Home() {
         alert(`Player ${turn} has won the match`);
         setgameclear(1);
       };
-      //Event launcher: 
+      if(turn=='X') setturn('O');
+      else  setturn('X');
       socket.emit("move",{id:e.target.id,turn});
-      if(turn=='X'){
-        setcountX(countX+1);
-        setturn('O');
-      }else{
-        setcountO(countO+1);
-        setturn('X');
-      }
-      console.log("yeh curr value aani chaiye: ",turn);
     } 
   }
   return (
